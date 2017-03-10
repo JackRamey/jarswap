@@ -7,7 +7,7 @@ import argparse
 CWD = os.getcwd()
 HOME = os.path.expanduser('~')
 IVY_CACHE = os.path.join(HOME, '.ivy2', 'cache')
-PROJECT_JAR_LOCATION = os.path.join(CWD, 'build', 'libs')
+BUILD_DIR = os.path.join(CWD, 'build', 'libs')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('package', help='The package that the jar is delivered in.')
@@ -17,8 +17,12 @@ parser.add_argument('-f', '--force', action='store_true',
                          "existing backup")
 parser.add_argument('-R', '--restore', action='store_true',
                     help="Restore the latest backup.")
-parser.add_argument('--cache', metavar='cache', type=str, nargs='?',
-                    help="Specify a directory which will be used as the cache instead of the default ivy2 cache.")
+parser.add_argument('--build', metavar='build', type=str, nargs='?', default=BUILD_DIR,
+                    help="Specify a directory where the build jar will be located. "
+                         "The default is {}".format(BUILD_DIR))
+parser.add_argument('--cache', metavar='cache', type=str, nargs='?', default=IVY_CACHE,
+                    help="Specify a directory which will be used as the cache instead of the default ivy2 cache. "
+                         "The default is {}".format(IVY_CACHE))
 args = parser.parse_args()
 
 
@@ -107,18 +111,17 @@ def find_latest_jar(package: str, project: str) -> JarFile:
     return max(jars)
 
 
-def get_latest_build_jar(project: str) -> JarFile:
-    print('Searching for latest jar in: {}'.format(PROJECT_JAR_LOCATION))
-    pattern = '(.*)-([0-9.]*)\.jar$'.format(project)
-    jars = filter(lambda file: re.match(pattern, file), os.listdir(PROJECT_JAR_LOCATION))
+def get_latest_build_jar(build_dir: str) -> JarFile:
+    print('Searching for latest jar in: {}'.format(build_dir))
+    pattern = '(.*)-([0-9.]*)\.jar$'
+    jars = filter(lambda file: re.match(pattern, file), os.listdir(build_dir))
     jar_files = map(JarFile, jars)
     return max(jar_files)
 
 
 # Check all files and directories exist needed for this script to run.
 def check_files_and_directories(cache_dir):
-    return is_file("gradlew") \
-           and is_directory(cache_dir)
+    return is_directory(cache_dir)
 
 
 def is_file(file):
@@ -135,8 +138,8 @@ def is_directory(directory):
     return check
 
 
-def create_backup_and_replace(cache_dir, package, project, force):
-    latest_jar = get_latest_build_jar(project)
+def create_backup_and_replace(cache_dir, build_dir, package, project, force):
+    latest_jar = get_latest_build_jar(build_dir)
     if not latest_jar:
         print('Could not find latest build.')
         exit(1)
@@ -147,7 +150,7 @@ def create_backup_and_replace(cache_dir, package, project, force):
     latest_jar.basename = current_jar.basename
     latest_jar.version = current_jar.version
 
-    source = os.path.join(PROJECT_JAR_LOCATION)
+    source = build_dir
     destination = os.path.join(cache_dir, package, project, 'jars')
 
     current_jar.create_backup(destination, force)
@@ -161,15 +164,16 @@ def restore_latest_backup(cache_dir, package, project):
 
 if __name__ == "__main__":
 
-    cache = IVY_CACHE if not args.cache else os.path.expanduser(args.cache)
+    cache = os.path.expanduser(args.cache)
+    build = os.path.expanduser(args.build)
 
     if not check_files_and_directories(cache):
         exit(1)
-    if not is_directory(PROJECT_JAR_LOCATION):
+    if not is_directory(build):
         exit(1)
 
     if not args.restore:
-        create_backup_and_replace(cache, args.package, args.project, args.force)
+        create_backup_and_replace(cache, build, args.package, args.project, args.force)
     else:
         restore_latest_backup(cache, args.package, args.project)
 
