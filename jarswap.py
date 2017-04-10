@@ -26,8 +26,25 @@ parser.add_argument('--cache', metavar='cache', type=str, nargs='?', default=IVY
 args = parser.parse_args()
 
 
+class JarFileFactory:
+    @staticmethod
+    def create_jar_file(filename):
+        parsed_filename = JarFileFactory._parse_filename(filename)
+        if parsed_filename is not None:
+            return parsed_filename
+
+    @staticmethod
+    def _parse_filename(filename):
+        matches = re.search('(.*)-([0-9.]*)(\.jar|\.jar\.bak)$', filename)
+        if matches:
+            groups = matches.groups()
+            return JarFile(filename, groups[0], groups[1], groups[2])
+        else:
+            return None
+
+
 class JarFile:
-    def __init__(self, filename):
+    def __init__(self, filename, basename, version, extension):
         self.filename = filename
         self.basename = self.extract_basename()
         self.version = self.extract_version()
@@ -48,8 +65,8 @@ class JarFile:
     def create_backup(self, directory, force):
         if os.path.isfile(os.path.join(directory, self.construct_backup_filename())) and not force:
             print('Backup for this project and package already exists. '
-                  'Aborting to avoid destruction of previous backup.')
-            exit(1)
+                  'Will not create a new backup, overwriting existing jar.')
+            return
         original_path = os.path.join(directory, self.filename)
         backup_path = os.path.join(directory, self.filename + '.bak')
         print('Creating backup: {}'.format(backup_path))
@@ -107,7 +124,7 @@ def find_latest_jar(package: str, project: str) -> JarFile:
         print('Could not find project [{}] in package [{}]'.format(project, package))
     if not os.path.isdir(jar_path):
         print('Could not find jars directory within project path: {}'.format(project_path))
-    jars = map(JarFile, os.listdir(jar_path))
+    jars = filter(None, map(JarFileFactory.create_jar_file, os.listdir(jar_path)))
     return max(jars)
 
 
@@ -115,7 +132,7 @@ def get_latest_build_jar(build_dir: str) -> JarFile:
     print('Searching for latest jar in: {}'.format(build_dir))
     pattern = '(.*)-([0-9.]*)\.jar$'
     jars = filter(lambda file: re.match(pattern, file), os.listdir(build_dir))
-    jar_files = map(JarFile, jars)
+    jar_files = filter(None, map(JarFileFactory.create_jar_file, jars))
     return max(jar_files)
 
 

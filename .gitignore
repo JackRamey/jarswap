@@ -88,6 +88,9 @@ ENV/
 # Rope project settings
 .ropeproject
 
+# Idea
+.idea/
+
 # Vim File
 *.un~
 
